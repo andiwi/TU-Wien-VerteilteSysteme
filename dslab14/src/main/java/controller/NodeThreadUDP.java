@@ -1,9 +1,6 @@
 package controller;
 
-import java.io.IOException;
 import java.net.DatagramPacket;
-import java.net.InetAddress;
-import java.net.SocketAddress;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.Map;
@@ -58,8 +55,10 @@ public class NodeThreadUDP extends Thread
 				n.setInetAddress(packet.getAddress());
 
 				Set<Character> operatorSet = new HashSet<Character>();
-				for (int i = 0; i < operators.length()-1; i++)
+				int alivePortLength = requestStrings[0].length() + requestStrings[1].length() + 2; //calculates the length of the !alive and the port string
+				for(int i = 0; i < packet.getLength()-alivePortLength; i++)
 				{
+					
 					if(operators.charAt(i) != ' ')
 						operatorSet.add(operators.charAt(i));
 				}
