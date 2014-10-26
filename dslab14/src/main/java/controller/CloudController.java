@@ -5,9 +5,7 @@ import java.io.InputStream;
 import java.io.PrintStream;
 import java.net.DatagramSocket;
 import java.net.ServerSocket;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.Timer;
@@ -26,6 +24,7 @@ public class CloudController implements ICloudControllerCli, Runnable {
 	private ServerSocket serverSocket;
 	private DatagramSocket datagramSocket;
 	private Shell shell;
+	private Timer isAvailableTimer;
 	
 
 	/**
@@ -60,8 +59,7 @@ public class CloudController implements ICloudControllerCli, Runnable {
 		try {
 			shell.writeLine("starting cloud-controller...");
 		} catch (IOException e1) {
-			// TODO Auto-generated catch block
-			e1.printStackTrace();
+			exit();
 		}
 
 		this.users = readUserConfig();	
@@ -70,11 +68,13 @@ public class CloudController implements ICloudControllerCli, Runnable {
 		try
 		{
 			serverSocket = new ServerSocket(config.getInt("tcp.port"));
-			// handle incoming connections from client with a ThreadPool in a separate thread
-			new ListenerThreadTCP(this.serverSocket, this.shell, users, nodes).start();
+			
+			// handle incoming connections from client in a separate thread
+			new ListenerThreadTCP(serverSocket, users, nodes).start();
 		} catch (IOException e)
 		{
-			throw new RuntimeException("Cannot listen on TCP port.", e);
+			System.err.println("Cannot listen on TCP port");
+			exit();
 		}
 		// create and start a new UDP DatagramSocket
 		try
@@ -83,19 +83,19 @@ public class CloudController implements ICloudControllerCli, Runnable {
 			datagramSocket = new DatagramSocket(config.getInt("udp.port"));
 	
 			// create a new thread to listen for incoming packets
-			new ListenerThreadUDP(this.datagramSocket, this.shell, nodes).start();
+			new ListenerThreadUDP(datagramSocket, nodes).start();
 		} catch (IOException e)
 		{
-			throw new RuntimeException("Cannot listen on UDP port.", e);
+			System.err.println("Cannot listen on UDP port");
+			exit();
 		}
 		
-		//checkAvailableNodes();
+		checkAvailableNodes();
 		
 		try {
 			shell.writeLine("Controller is up! Enter command.");
 		} catch (IOException e1) {
-			// TODO Auto-generated catch block
-			e1.printStackTrace();
+			exit();
 		}
 	}
 
@@ -106,7 +106,7 @@ public class CloudController implements ICloudControllerCli, Runnable {
 	private void checkAvailableNodes()
 	{
 		TimerTask isAvailableTimerTask = new IsAvailableTimerTask(nodes, config.getInt("node.timeout"));
-		Timer isAvailableTimer = new Timer(true);
+		isAvailableTimer = new Timer(true);
 		isAvailableTimer.scheduleAtFixedRate(isAvailableTimerTask, 0, config.getInt("node.checkPeriod"));
 	}
 
@@ -124,13 +124,6 @@ public class CloudController implements ICloudControllerCli, Runnable {
 			info += i + ". " + n.toString() + "\n";
 		}
 		
-		
-		/*
-		for(int i = 0; i < nodes.size(); i++)
-		{
-			info += i+1 + ". " + nodes.get(i).toString() + "\n";
-		}
-		*/
 		info = info.substring(0, info.length()-3);
 		return info;
 	}
@@ -153,11 +146,45 @@ public class CloudController implements ICloudControllerCli, Runnable {
 
 	@Override
 	@Command
-	public String exit() throws IOException {
-		// TODO Auto-generated method stub
-		return null;
+	public String exit() {
+		// Stop the Shell from listening for commands
+		shell.close();
+		
+		//logout each logged in user
+				logoutAllUsers();
+				
+		isAvailableTimer.cancel();
+				
+		if (serverSocket != null && !serverSocket.isClosed())
+		{
+			try {
+				serverSocket.close();
+			} catch (IOException e) {
+				// Ignored because we cannot handle it
+			}
+		}
+		
+		if (datagramSocket != null && !datagramSocket.isClosed())
+		{
+			datagramSocket.close();
+		}
+		
+		
+		
+		return "Exit CloudController";
 	}
 	
+	private void logoutAllUsers()
+	{
+		if(users != null)
+		{
+			for(User u : users.values())
+			{
+				u.setStatus(Status.offline);
+			}
+		}
+	}
+
 	/**
 	 * reads the userConfig and initializes the Users
 	 * @return initialized List of Users
@@ -166,7 +193,6 @@ public class CloudController implements ICloudControllerCli, Runnable {
 	{
 		Map<String, User> users = new HashMap<String, User>();
 		Set<String> configKeys = userConfig.listKeys();
-		Map<String, List<String>> userMap = new HashMap<String, List<String>>();
 
 		for(String key : configKeys)
 		{
@@ -192,45 +218,7 @@ public class CloudController implements ICloudControllerCli, Runnable {
 			
 			users.put(username, user);
 		}
-			/*
-			
-			
-			
-			
-			
-			if(userMap.containsKey(username))
-			{
-				userMap.get(username).add(property);
-			}else
-			{
-				List<String> propertyList = new ArrayList<String>();
-				propertyList.add(property);
-				userMap.put(username, propertyList);
-			}
-		}
-		
-		for(String username : userMap.keySet())
-		{
-			User user = new User();
-			user.setUsername(username);
-			user.setStatus(Status.offline);
-			
-			List<String> properties = userMap.get(username);
-			
-			for(String property : properties)
-			{
-				if(property.equals("password"))
-				{
-					user.setPassword(userConfig.getString(username + "." + property));
-				}else if (property.equals("credits"))
-				{
-					user.setCredits(userConfig.getInt(username + "." + property));
-				}
-			}
-			
-			users.add(user);
-		}
-		*/
+
 		return users;
 	}
 

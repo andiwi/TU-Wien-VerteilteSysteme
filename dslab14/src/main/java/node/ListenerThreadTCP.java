@@ -8,32 +8,28 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import util.Config;
-import controller.ClientThreadTCP;
-import cli.Shell;
 
 public class ListenerThreadTCP extends Thread{
 
 	private ServerSocket serverSocket;
-	private Shell nodeShell;
 	private Set<Character> operators;
+	private boolean running;
+	private String componentName;
+	private Config config;
 	
-	public ListenerThreadTCP(ServerSocket serverSocket, Shell nodeShell, Set<Character> operators) {
+	public ListenerThreadTCP(ServerSocket serverSocket, Set<Character> operators, String componentName, Config config) {
 		this.serverSocket = serverSocket;
-		this.nodeShell = nodeShell;
 		this.operators = operators;
+		this.running = true;
+		this.componentName = componentName;
+		this.config = config;
 	}
 	
-	public void run() {
-		try {
-			nodeShell.writeLine("starting new ListenerThreadTCP...");
-		} catch (IOException e1) {
-			// TODO Auto-generated catch block
-			e1.printStackTrace();
-		}
-		
+	public void run()
+	{
 		ExecutorService executor = Executors.newCachedThreadPool();
 		
-		while (true) {
+		while (running) {
 			Socket socket = null;
 			try
 			{
@@ -41,14 +37,12 @@ public class ListenerThreadTCP extends Thread{
 				socket = serverSocket.accept();
 				
 				// handle incoming connections from client with a ThreadPool in a separate thread
-				executor.execute(new ComputeThreadTCP(socket, this.nodeShell, this.operators));
+				executor.execute(new ComputeThreadTCP(socket, this.operators, this.componentName, this.config));
 				
 			} catch (IOException e)
 			{
-				System.err
-						.println("Error occurred while waiting for/communicating with client: "
-								+ e.getMessage());
-				break;
+				executor.shutdownNow();
+				running = false;
 			} 
 		}
 	}

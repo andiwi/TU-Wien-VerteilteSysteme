@@ -22,7 +22,6 @@ public class IsAliveTimerTask extends TimerTask {
 		try {
 			datagramSocket.send(datagramPacket);
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 

@@ -53,10 +53,6 @@ public class Node
 		this.operators = operators;
 	}
 	
-	@Override
-	public String toString() {
-		return "IP: " + ip + " Port: " + tcpPort + " " + status	+ " Usage: " + usage;
-	}
 	public InetAddress getInetAddress()
 	{
 		return inetAddress;
@@ -66,6 +62,8 @@ public class Node
 		this.inetAddress = inetAddress;
 	}
 	
-	
-	
+	@Override
+	public String toString() {
+		return "IP: " + ip + " Port: " + tcpPort + " " + status	+ " Usage: " + usage;
+	}
 }

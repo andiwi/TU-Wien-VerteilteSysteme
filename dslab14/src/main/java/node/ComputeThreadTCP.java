@@ -1,73 +1,136 @@
 package node;
 
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
-import java.util.List;
+import java.nio.file.FileAlreadyExistsException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.Set;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 import util.Config;
-import cli.Command;
-import cli.Shell;
 
 public class ComputeThreadTCP extends Thread {
 
 	private Socket socket;
-	private Shell nodeShell;
-	private Config config;
 	private Set<Character> operators;
+	private BufferedReader reader;
+	private PrintWriter writer;
+	private String componentName;
+	private Config config;
 	
-	public ComputeThreadTCP(Socket socket, Shell nodeShell, Set<Character> operators) {
+	// SimpleDateFormat is not thread-safe, so give one to each thread
+    private static final ThreadLocal<SimpleDateFormat> dateFormatter = new ThreadLocal<SimpleDateFormat>(){
+        @Override
+        protected SimpleDateFormat initialValue()
+        {
+            return new SimpleDateFormat("yyyyMMdd_HHmmss.SSS");
+        }
+    };
+	
+	public ComputeThreadTCP(Socket socket, Set<Character> operators, String componentName, Config config) {
 		this.socket = socket;
-		this.nodeShell = nodeShell;
 		this.operators = operators;
+		this.componentName = componentName;
+		this.config = config;
 	}
 	
 	public void run()
 	{
-	
-		try
-		{
-			nodeShell.writeLine("starting new ComputeThreadTCP...");
-		} catch (IOException e1)
-		{
-			// TODO Auto-generated catch block
-			e1.printStackTrace();
-		}
-		
 		try
 		{
 			// prepare the input reader for the socket
-			BufferedReader reader = new BufferedReader(
+			reader = new BufferedReader(
 					new InputStreamReader(socket.getInputStream()));
 			// prepare the writer for responding to clients requests
-			PrintWriter writer = new PrintWriter(socket.getOutputStream(),
+			writer = new PrintWriter(socket.getOutputStream(),
 					true);
 
 			String request;
 			// read client requests
-			while ((request = reader.readLine()) != null) {
-
-				nodeShell.writeLine("CloudController sent the following request: "
-						+ request);
-
-				
+			while ((request = reader.readLine()) != null)
+			{
 				String response = doRequestCommand(request);
 				writer.println(response);
+
+				createLogFile(request.substring(9), response);
+
+				if (Thread.interrupted())
+					break;
 			}
+			closeAllStreams();
 		}catch(IOException e)
 		{
-			// TODO Auto-generated method stub
-		}
-		
-		
-		
+			closeAllStreams();
+		}	
 	}
 	
+	private void createLogFile(String row1, String row2)
+	{
+		String date = dateFormatter.get().format(new Date());
+		
+		try
+		{
+			
+			String currentDir = System.getProperty("user.dir");
+			String pathStr = currentDir + File.separator + config.getString("log.dir") + File.separator + date + "_" + componentName + ".log";
+			
+			Path path = Paths.get(pathStr);
+			Files.createDirectories(path.getParent());
+
+	        try {
+	           File file = Files.createFile(path).toFile();
+	           
+	           FileWriter fw = new FileWriter(file);
+	           BufferedWriter bw = new BufferedWriter(fw);
+	           bw.append(row1);
+	           bw.newLine();
+	           bw.append(row2);
+	           bw.close();
+	           fw.close();
+	           
+	        } catch (FileAlreadyExistsException e) {
+	            System.err.println("already exists: " + e.getMessage());
+	        }  
+		}catch (IOException e)
+		{
+			e.printStackTrace();
+		}
+	}
+
+	private void closeAllStreams()
+	{
+		if(reader != null)
+			try
+			{
+				reader.close();
+				//socket.getInputStream().close();
+			} catch (IOException e1)
+			{
+				// Ignored because we cannot handle it
+			}
+		
+		if(writer != null)
+			writer.close();
+		
+		if (socket != null && !socket.isClosed())
+		{
+			try {
+				socket.close();
+			} catch (IOException e) {
+				// Ignored because we cannot handle it
+			}
+		}	
+	}
+
 	/**
 	 * Checks if the request contains a known Command and does the command.
 	 * @param request

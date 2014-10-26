@@ -6,19 +6,15 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-import cli.Shell;
-
 public class NodeThreadUDP extends Thread
 {
 	private DatagramPacket packet;
-	private Shell controllerShell;
 	private Map<Integer, Node> nodes;
 
-	public NodeThreadUDP(DatagramPacket packet, Shell controllerShell,
+	public NodeThreadUDP(DatagramPacket packet,
 			Map<Integer, Node> nodes)
 	{
 		this.packet = packet;
-		this.controllerShell = controllerShell;
 		this.nodes = nodes;
 	}
 

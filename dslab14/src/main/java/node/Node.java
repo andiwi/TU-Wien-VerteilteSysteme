@@ -25,8 +25,10 @@ public class Node implements INodeCli, Runnable {
 	private Config config;
 	private Shell shell;
 	private ServerSocket serverSocket;
+	private DatagramSocket datagramSocket;
 	private Set<Character> operators;
-
+	private Timer isAliveTimer;
+	private String componentName;
 	/**
 	 * @param componentName
 	 *            the name of the component - represented in the prompt
@@ -41,6 +43,7 @@ public class Node implements INodeCli, Runnable {
 			InputStream userRequestStream, PrintStream userResponseStream) {
 		this.config = config;
 		this.shell = new Shell(componentName, userRequestStream, userResponseStream);
+		this.componentName = componentName;
 		shell.register(this);
 	}
 
@@ -54,8 +57,7 @@ public class Node implements INodeCli, Runnable {
 		try {
 			shell.writeLine("starting node...");
 		} catch (IOException e1) {
-			// TODO Auto-generated catch block
-			e1.printStackTrace();
+			exit();
 		}
 		
 		// create and start a new TCP ServerSocket
@@ -63,18 +65,19 @@ public class Node implements INodeCli, Runnable {
 		{
 			serverSocket = new ServerSocket(config.getInt("tcp.port"));
 			// handle incoming connections from client with a ThreadPool in a separate thread
-			new ListenerThreadTCP(this.serverSocket, this.shell, operators).start();
+			new ListenerThreadTCP(serverSocket, operators, componentName, config).start();
 		} catch (IOException e)
 		{
-			throw new RuntimeException("Cannot listen on TCP port.", e);
+			System.err.println("Cannot listen on TCP port." + e);
+			exit();
 		}
 		
 		sendingIsAlivePackages();
+		
 		try {
 			shell.writeLine("Node is up! Enter command.");
 		} catch (IOException e1) {
-			// TODO Auto-generated catch block
-			e1.printStackTrace();
+			exit();
 		}
 	}
 
@@ -95,7 +98,7 @@ public class Node implements INodeCli, Runnable {
 	{
 		try {
 			// open a new DatagramSocket
-			DatagramSocket datagramSocket = new DatagramSocket();
+			datagramSocket = new DatagramSocket();
 
 			byte[] buffer;
 			DatagramPacket packet;
@@ -111,23 +114,40 @@ public class Node implements INodeCli, Runnable {
 					config.getInt("controller.udp.port"));
 
 			TimerTask isAliveTimerTask = new IsAliveTimerTask(datagramSocket, packet);
-			Timer isAliveTimer = new Timer(true);
+			isAliveTimer = new Timer(true);
 			isAliveTimer.scheduleAtFixedRate(isAliveTimerTask, 0, config.getInt("node.alive"));
 				
 		} catch (SocketException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+			exit();
 		} catch (UnknownHostException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+			System.err.print(e);
+			exit();
 		}
 	}
 
 	@Override
 	@Command
-	public String exit() throws IOException {
-		// TODO Auto-generated method stub
-		return null;
+	public String exit() {
+		// Stop the Shell from listening for commands
+		shell.close();				
+				
+		isAliveTimer.cancel();
+				
+		if (serverSocket != null && !serverSocket.isClosed())
+		{
+			try {
+				serverSocket.close();
+			} catch (IOException e) {
+				// Ignored because we cannot handle it
+			}
+		}
+		
+		if (datagramSocket != null && !datagramSocket.isClosed())
+		{
+			datagramSocket.close();
+		}
+		
+		return "Exit CloudController";
 	}
 
 	@Override

@@ -28,7 +28,6 @@ public class IsAvailableTimerTask extends TimerTask
 			{
 				n.setStatus(Status.online);
 			}
-			//System.out.println("IsAvailableTimerTask for Node: " + n);
 		}
 	}
 }

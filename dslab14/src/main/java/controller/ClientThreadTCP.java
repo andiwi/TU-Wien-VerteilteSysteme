@@ -12,71 +12,79 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import cli.Shell;
-
 public class ClientThreadTCP extends Thread
 {
 	private Socket socket;
-	private Shell controllerShell;
 	private Map<String, User> users;
 	private Map<Integer, Node> nodes;
 	private User loggedInUser;
+	private BufferedReader reader;
+	private PrintWriter writer;
 
-	public ClientThreadTCP(Socket socket, Shell controllerShell, Map<String, User> users, Map<Integer, Node> nodes)
+	public ClientThreadTCP(Socket socket, Map<String, User> users, Map<Integer, Node> nodes)
 	{
 		this.socket = socket;
-		this.controllerShell = controllerShell;
 		this.users = users;
 		this.nodes = nodes;
 	}
 	
 	public void run()
 	{
-	
-		try
-		{
-			controllerShell.writeLine("starting new ClientThreadTCP...");
-		} catch (IOException e1)
-		{
-			// TODO Auto-generated catch block
-			e1.printStackTrace();
-		}
-		
-		
 		try
 		{
 			// prepare the input reader for the socket
-			BufferedReader reader = new BufferedReader(
+			reader = new BufferedReader(
 					new InputStreamReader(socket.getInputStream()));
 			// prepare the writer for responding to clients requests
-			PrintWriter writer = new PrintWriter(socket.getOutputStream(),
+			writer = new PrintWriter(socket.getOutputStream(),
 					true);
 
+					
 			String request;
-			// read client requests
-			while ((request = reader.readLine()) != null) {
-
-				controllerShell.writeLine("Client sent the following request: "
-						+ request);
-
+			// read client requests			
+			while ((request = reader.readLine()) != null)
+			{
 				String response = doRequestCommand(request);
 				
 				if(response.equals("EXIT"))
 					break;
 				
 				writer.println(response);
+				
+				if(Thread.interrupted())
+					break;
 			}
-			reader.close();
-			writer.close();
-			socket.close();
-			
+			closeAllStreams();
 		}catch(IOException e)
 		{
-			// TODO Auto-generated method stub
+			closeAllStreams();
 		}
 	}
-	
-	
+
+	private void closeAllStreams()
+	{
+		if(reader != null)
+			try
+			{
+				reader.close();
+				//socket.getInputStream().close();
+			} catch (IOException e1)
+			{
+				// Ignored because we cannot handle it
+			}
+		
+		if(writer != null)
+			writer.close();
+		
+		if (socket != null && !socket.isClosed())
+		{
+			try {
+				socket.close();
+			} catch (IOException e) {
+				// Ignored because we cannot handle it
+			}
+		}	
+	}
 
 	/**
 	 * Checks if the request contains a known Command and does the command.
@@ -121,7 +129,7 @@ public class ClientThreadTCP extends Thread
 		return "Unknown Command. " + listAvailableCommands();
 	}
 
-	private String login(String username, String password)
+	private synchronized String login(String username, String password)
 	{
 		if(loggedInUser == null)
 		{
@@ -137,11 +145,11 @@ public class ClientThreadTCP extends Thread
 					loggedInUser = candidate;
 					loggedInUser.setStatus(Status.online);
 					
-					return "Successfully logged in! " + username; //TODO username wegloeschen in endabgabe
+					return "Successfully logged in!";
 				}
 			}
 			return "Wrong username or password";
-		}else return "You are already logged in! " + loggedInUser.getUsername(); //TODO username wegloeschen in endabgabe
+		}else return "You are already logged in!";
 	}
 	
 	private String exit()
@@ -226,23 +234,38 @@ public class ClientThreadTCP extends Thread
 				{
 					return "Error: Illegal Arguments.";
 				}
-					
-				Node node = getBestNodeForOperator(operator);
-				if(node != null)
+				
+				boolean tryAgain = true;
+				int trials = 0; //counter that prevents infinity loops
+				while(tryAgain && (trials < 10))
 				{
-					String result = sendToNode(number1, operator, number2, node);
-					if(result.startsWith("Error:"))
-					{
-						return result;
-					}else
-					{
-						node.setUsage(node.getUsage() + (50 * result.length())); //if computation was processed successfully the usage of the node increases.
-						arguments.add(0, result);
-					}
+					tryAgain = false;
+					trials++;
 					
-				}else return "Error while computing.";
+					Node node = getBestNodeForOperator(operator);
+					if(node != null)
+					{
+						String result = sendToNode(number1, operator, number2, node);
+						if(result.equals("Error: Cannot connect to Node."))
+						{
+							node.setStatus(Status.offline);
+							tryAgain = true;
+						}else if(result.startsWith("Error:"))
+						{
+							loggedInUser.setCredits(loggedInUser.getCredits() - 50); //For each computation the user has to pay credits
+							return result;
+						}else
+						{
+							loggedInUser.setCredits(loggedInUser.getCredits() - 50);
+							node.setUsage(node.getUsage() + (50 * result.length())); //if computation was processed successfully the usage of the node increases.
+							arguments.add(0, result);
+						}
+						
+					}else return "Cannot compute the request (no known Node)";
+				}
+				if(trials == 10)
+					return "Cannot compute the request (no known Node)";
 			}
-			loggedInUser.setCredits(loggedInUser.getCredits() - (50 * numberOfOperators)); //If computation was successful, the User has to pay credits.
 			return arguments.get(0);
 		}else return "Wrong number of terms";
 	}
@@ -283,13 +306,6 @@ public class ClientThreadTCP extends Thread
 		return list;
 	}
 	
-
-	
-
-	
-	
-	
-
 	/**
 	 * Sends the request via TCP to the Node 
 	 * @param number1
@@ -336,7 +352,7 @@ public class ClientThreadTCP extends Thread
 		
 		for(Node n : nodes.values())
 		{
-			if(n.getOperators().contains(operator))
+			if(n.getOperators().contains(operator) && n.getStatus() == Status.online)
 			{
 				if(bestNode == null)
 				{

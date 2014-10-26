@@ -20,9 +20,6 @@ public class Client implements IClientCli, Runnable {
 	private PrintWriter serverWriter;
 	private BufferedReader serverReader;
 	private Shell shell;
-	private String componentName;
-	private InputStream userRequestStream;
-	private PrintStream userResponseStream;
 	
 	/**
 	 * @param componentName
@@ -39,9 +36,6 @@ public class Client implements IClientCli, Runnable {
 	{
 		this.config = config;		
 		this.socket = null;
-		this.componentName = componentName;
-		this.userRequestStream = userRequestStream;
-		this.userResponseStream = userResponseStream;
 		this.shell = new Shell(componentName, userRequestStream, userResponseStream);
 		shell.register(this);
 	}
@@ -65,39 +59,26 @@ public class Client implements IClientCli, Runnable {
 					new InputStreamReader(socket.getInputStream()));
 			
 			new Thread(shell).start();
-			//new Thread(readerShell).start();
-			System.out.println("Client is up! Enter command.");
+
+			shell.writeLine("Client is up! Enter command");
 
 		} catch (UnknownHostException e) {
 			System.out.println("Cannot connect to host: " + e.getMessage());
+			closeAllStreams();
+			
 		} catch (IOException e) {
 			System.out.println(e.getClass().getSimpleName() + ": "
 					+ e.getMessage());
+			closeAllStreams();
 		}
-		/*
-		finally {
-			// Stop the Shell from listening for commands
-			shell.close();
-			
-			if (socket != null && !socket.isClosed())
-				try {
-					socket.close();
-				} catch (IOException e) {
-					// Ignored because we cannot handle it
-				}
-		}
-		*/
 	}
 
 	@Override
 	@Command
 	public String login(String username, String password) throws IOException
 	{
-		// write provided user input to the socket
 		serverWriter.println("!login " + username + " " + password);
-		// read server response and write it to console
-		String response = serverReader.readLine();
-		return response;
+		return serverReader.readLine();
 	}
 
 	@Override
@@ -125,8 +106,7 @@ public class Client implements IClientCli, Runnable {
 	@Command
 	public String list() throws IOException {
 		serverWriter.println("!list");
-		String response = serverReader.readLine();
-		return response;
+		return serverReader.readLine();
 	}
 
 	@Override
@@ -139,11 +119,28 @@ public class Client implements IClientCli, Runnable {
 	@Override
 	@Command
 	public String exit() throws IOException {
-		serverWriter.println("!logout");
+		serverWriter.println("!exit");
+		closeAllStreams();
 		
+		return "Exit Client";
+	}
+	
+	private void closeAllStreams()
+	{
 		// Stop the Shell from listening for commands
-		//shell.close();
-					
+		shell.close();
+		
+		if (serverWriter != null)
+			serverWriter.close();
+		
+		if (serverReader != null)
+			try
+			{
+				serverReader.close();
+			} catch (IOException e) {
+				// Ignored because we cannot handle it
+			}
+		
 		if (socket != null && !socket.isClosed())
 		{
 			try {
@@ -152,8 +149,6 @@ public class Client implements IClientCli, Runnable {
 				// Ignored because we cannot handle it
 			}
 		}
-		
-		return "Exit Client";
 	}
 
 	/**
