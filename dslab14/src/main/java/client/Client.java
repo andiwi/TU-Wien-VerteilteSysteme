@@ -78,42 +78,42 @@ public class Client implements IClientCli, Runnable {
 	public String login(String username, String password) throws IOException
 	{
 		serverWriter.println("!login " + username + " " + password);
-		return serverReader.readLine();
+		return getResponse();
 	}
 
 	@Override
 	@Command
 	public String logout() throws IOException {
 		serverWriter.println("!logout");
-		return serverReader.readLine();
+		return getResponse();
 	}
 
 	@Override
 	@Command
 	public String credits() throws IOException {
 		serverWriter.println("!credits");
-		return serverReader.readLine();
+		return getResponse();
 	}
 
 	@Override
 	@Command
 	public String buy(long credits) throws IOException {
 		serverWriter.println("!buy " + credits);
-		return serverReader.readLine();
+		return getResponse();
 	}
 
 	@Override
 	@Command
 	public String list() throws IOException {
 		serverWriter.println("!list");
-		return serverReader.readLine();
+		return getResponse();
 	}
 
 	@Override
 	@Command
 	public String compute(String term) throws IOException {
 		serverWriter.println("!compute " + term);
-		return serverReader.readLine();
+		return getResponse();
 	}
 
 	@Override
@@ -149,6 +149,20 @@ public class Client implements IClientCli, Runnable {
 				// Ignored because we cannot handle it
 			}
 		}
+	}
+	
+	private String getResponse()
+	{
+		String response;
+		try
+		{
+			response = serverReader.readLine();
+		}catch(Exception e)
+		{
+			response = "Connection lost.";
+			closeAllStreams();
+		}
+		return response;
 	}
 
 	/**

@@ -62,7 +62,7 @@ public class ComputeThreadTCP extends Thread {
 				writer.println(response);
 
 				createLogFile(request.substring(9), response);
-
+				
 				if (Thread.interrupted())
 					break;
 			}
@@ -73,7 +73,7 @@ public class ComputeThreadTCP extends Thread {
 		}	
 	}
 	
-	private void createLogFile(String row1, String row2)
+	private synchronized void createLogFile(String row1, String row2)
 	{
 		String date = dateFormatter.get().format(new Date());
 		
@@ -98,7 +98,7 @@ public class ComputeThreadTCP extends Thread {
 	           fw.close();
 	           
 	        } catch (FileAlreadyExistsException e) {
-	            System.err.println("already exists: " + e.getMessage());
+	            System.out.println("already exists: " + e.getMessage());
 	        }  
 		}catch (IOException e)
 		{

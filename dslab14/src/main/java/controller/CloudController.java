@@ -124,7 +124,7 @@ public class CloudController implements ICloudControllerCli, Runnable {
 			info += i + ". " + n.toString() + "\n";
 		}
 		
-		info = info.substring(0, info.length()-3);
+		//info = info.substring(0, info.length()-3);
 		return info;
 	}
 
@@ -136,11 +136,15 @@ public class CloudController implements ICloudControllerCli, Runnable {
 			return "No known Users.";
 		
 		String info = "";
-		for(int i = 0; i < users.size(); i++)
+		
+		int i=0;
+		for(User user : users.values())
 		{
-			info += i+1 + ". " + users.get(i).toString() + "\n";
+			i++;
+			info += i + ". " + user.toString() + "\n";
 		}
-		info = info.substring(0, info.length()-3);
+		
+		//info = info.substring(0, info.length()-3);
 		return info;
 	}
 
