@@ -67,7 +67,6 @@ public class ClientThreadTCP extends Thread
 			try
 			{
 				reader.close();
-				//socket.getInputStream().close();
 			} catch (IOException e1)
 			{
 				// Ignored because we cannot handle it
@@ -76,7 +75,7 @@ public class ClientThreadTCP extends Thread
 		if(writer != null)
 			writer.close();
 		
-		if (socket != null && !socket.isClosed())
+		if (socket != null)
 		{
 			try {
 				socket.close();

@@ -133,7 +133,7 @@ public class Node implements INodeCli, Runnable {
 				
 		isAliveTimer.cancel();
 				
-		if (serverSocket != null && !serverSocket.isClosed())
+		if (serverSocket != null)
 		{
 			try {
 				serverSocket.close();
@@ -142,12 +142,12 @@ public class Node implements INodeCli, Runnable {
 			}
 		}
 		
-		if (datagramSocket != null && !datagramSocket.isClosed())
+		if (datagramSocket != null)
 		{
 			datagramSocket.close();
 		}
 		
-		return "Exit CloudController";
+		return "Exit Node";
 	}
 
 	@Override

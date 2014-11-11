@@ -79,10 +79,7 @@ public class ComputeThreadTCP extends Thread {
 		
 		try
 		{
-			
-			String currentDir = System.getProperty("user.dir");
-			String pathStr = currentDir + File.separator + config.getString("log.dir") + File.separator + date + "_" + componentName + ".log";
-			
+			String pathStr = config.getString("log.dir") + File.separator + date + "_" + componentName + ".log";
 			Path path = Paths.get(pathStr);
 			Files.createDirectories(path.getParent());
 

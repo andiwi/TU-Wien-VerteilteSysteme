@@ -20,6 +20,7 @@ public class Client implements IClientCli, Runnable {
 	private PrintWriter serverWriter;
 	private BufferedReader serverReader;
 	private Shell shell;
+	private ConnectorThread connector;
 	
 	/**
 	 * @param componentName
@@ -44,27 +45,11 @@ public class Client implements IClientCli, Runnable {
 	public void run()
 	{
 		try {
-			/*
-			 * create a new tcp socket at specified host and port
-			 */
-			this.socket = new Socket(config.getString("controller.host"),
-					config.getInt("controller.tcp.port"));
-						
-			// create a writer to send messages to the server
-			this.serverWriter = new PrintWriter(
-					socket.getOutputStream(), true);
-			
-			// create a reader to retrieve messages send by the server
-			this.serverReader = new BufferedReader(
-					new InputStreamReader(socket.getInputStream()));
+			connector = new ConnectorThread();
+			connector.start();
 			
 			new Thread(shell).start();
-
 			shell.writeLine("Client is up! Enter command");
-
-		} catch (UnknownHostException e) {
-			System.out.println("Cannot connect to host: " + e.getMessage());
-			closeAllStreams();
 			
 		} catch (IOException e) {
 			System.out.println(e.getClass().getSimpleName() + ": "
@@ -72,54 +57,89 @@ public class Client implements IClientCli, Runnable {
 			closeAllStreams();
 		}
 	}
+	
+	private String getResponse()
+	{
+		String response;
+		try
+		{
+			response = serverReader.readLine();
+		} catch (Exception e)
+		{
+			response = "Connection lost.";
+			if (connector == null)
+			{
+				connector = new ConnectorThread();
+				connector.start();
+			}
+		}
+		return response;
+	}
+
+	private boolean doRequest(String request)
+	{
+		try
+		{
+			serverWriter.println(request);
+			return true;
+		} catch (Exception e)
+		{
+			if (connector == null)
+			{
+				connector = new ConnectorThread();
+				connector.start();
+			}
+		}
+		return false;
+	}
 
 	@Override
 	@Command
-	public String login(String username, String password) throws IOException
+	public String login(String username, String password)
 	{
-		serverWriter.println("!login " + username + " " + password);
+		doRequest("!login " + username + " " + password);
 		return getResponse();
 	}
 
 	@Override
 	@Command
 	public String logout() throws IOException {
-		serverWriter.println("!logout");
+		doRequest("!logout");
 		return getResponse();
 	}
 
 	@Override
 	@Command
 	public String credits() throws IOException {
-		serverWriter.println("!credits");
+		doRequest("!credits");
 		return getResponse();
 	}
 
 	@Override
 	@Command
 	public String buy(long credits) throws IOException {
-		serverWriter.println("!buy " + credits);
+		doRequest("!buy " + credits);
 		return getResponse();
 	}
 
 	@Override
 	@Command
 	public String list() throws IOException {
-		serverWriter.println("!list");
+		doRequest("!list");
 		return getResponse();
 	}
 
 	@Override
 	@Command
 	public String compute(String term) throws IOException {
-		serverWriter.println("!compute " + term);
+		doRequest("!compute " + term);
 		return getResponse();
 	}
 
 	@Override
 	@Command
 	public String exit() throws IOException {
-		serverWriter.println("!exit");
+		doRequest("!exit");
 		closeAllStreams();
 		
 		return "Exit Client";
@@ -129,6 +149,8 @@ public class Client implements IClientCli, Runnable {
 	{
 		// Stop the Shell from listening for commands
 		shell.close();
+		if(connector != null)
+			connector.setTryToConnect(false);
 		
 		if (serverWriter != null)
 			serverWriter.close();
@@ -141,7 +163,7 @@ public class Client implements IClientCli, Runnable {
 				// Ignored because we cannot handle it
 			}
 		
-		if (socket != null && !socket.isClosed())
+		if (socket != null)
 		{
 			try {
 				socket.close();
@@ -151,19 +173,7 @@ public class Client implements IClientCli, Runnable {
 		}
 	}
 	
-	private String getResponse()
-	{
-		String response;
-		try
-		{
-			response = serverReader.readLine();
-		}catch(Exception e)
-		{
-			response = "Connection lost.";
-			closeAllStreams();
-		}
-		return response;
-	}
+	
 
 	/**
 	 * @param args
@@ -186,4 +196,61 @@ public class Client implements IClientCli, Runnable {
 		return null;
 	}
 
+	
+	
+	
+	
+	
+	
+	public class ConnectorThread extends Thread
+	{
+		private boolean tryToConnect;
+				
+		public ConnectorThread() {
+			this.tryToConnect = true;
+		}
+		
+		public void run() {
+			socket = null;
+			try
+			{
+				shell.writeLine("Try to get connection...");
+			} catch (IOException e1)
+			{}
+			while(tryToConnect && socket == null) {
+				try {
+					/*
+					 * create a new tcp socket at specified host and port
+					 */
+		            socket = new Socket(config.getString("controller.host"),
+							config.getInt("controller.tcp.port"));
+		            
+		            // create a writer to send messages to the server
+					serverWriter = new PrintWriter(
+							socket.getOutputStream(), true);
+					
+					// create a reader to retrieve messages send by the server
+					serverReader = new BufferedReader(
+							new InputStreamReader(socket.getInputStream()));
+					
+					shell.writeLine("Connected to server!");
+		        } catch (UnknownHostException e) {
+		            socket = null;
+		            serverWriter = null;
+		            serverReader = null;
+		        } catch (IOException e) {
+		            socket = null;
+		            serverWriter = null;
+		            serverReader = null;
+		        }
+			}
+			connector = null;
+		}
+		
+		public void setTryToConnect(boolean tryToConnect)
+		{
+			this.tryToConnect = tryToConnect;
+		}
+	}
+	
 }

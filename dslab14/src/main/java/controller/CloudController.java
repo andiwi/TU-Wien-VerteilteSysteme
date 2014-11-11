@@ -155,7 +155,7 @@ public class CloudController implements ICloudControllerCli, Runnable {
 		shell.close();
 		
 		//logout each logged in user
-				logoutAllUsers();
+		logoutAllUsers();
 				
 		isAvailableTimer.cancel();
 				
@@ -172,8 +172,6 @@ public class CloudController implements ICloudControllerCli, Runnable {
 		{
 			datagramSocket.close();
 		}
-		
-		
 		
 		return "Exit CloudController";
 	}
