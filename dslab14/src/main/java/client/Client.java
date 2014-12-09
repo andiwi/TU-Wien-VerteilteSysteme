@@ -15,6 +15,7 @@ import util.Config;
 
 public class Client implements IClientCli, Runnable {
 
+	
 	private Config config;
 	private Socket socket;
 	private PrintWriter serverWriter;
