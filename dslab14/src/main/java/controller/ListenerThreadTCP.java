@@ -6,17 +6,18 @@ import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class ListenerThreadTCP extends Thread
 {
 	private ServerSocket serverSocket;
-	private Map<String, User> users;
-	private Map<Integer, Node> nodes;
+	private ConcurrentMap<String, User> users;
+	private ConcurrentMap<Integer, Node> nodes;
 	private boolean running;
 
-	public ListenerThreadTCP(ServerSocket serverSocket, Map<String, User> users, Map<Integer, Node> nodes) {
+	public ListenerThreadTCP(ServerSocket serverSocket, ConcurrentMap<String, User> users, ConcurrentMap<Integer, Node> nodes) {
 		this.serverSocket = serverSocket;
 		this.users = users;
 		this.nodes = nodes;

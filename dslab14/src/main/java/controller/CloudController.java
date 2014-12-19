@@ -5,11 +5,11 @@ import java.io.InputStream;
 import java.io.PrintStream;
 import java.net.DatagramSocket;
 import java.net.ServerSocket;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 import util.Config;
 import cli.Command;
@@ -19,8 +19,8 @@ public class CloudController implements ICloudControllerCli, Runnable {
 
 	private Config config;
 	private Config userConfig;
-	private	Map<String, User> users;
-	private Map<Integer, Node> nodes;
+	private	ConcurrentMap<String, User> users;
+	private ConcurrentMap<Integer, Node> nodes;
 	private ServerSocket serverSocket;
 	private DatagramSocket datagramSocket;
 	private Shell shell;
@@ -41,8 +41,8 @@ public class CloudController implements ICloudControllerCli, Runnable {
 			InputStream userRequestStream, PrintStream userResponseStream, Config userConfig) {
 		this.config = config;
 		this.userConfig = userConfig;
-		this.users = new HashMap<String, User>();
-		this.nodes = new HashMap<Integer, Node>();
+		this.users = new ConcurrentHashMap<String, User>();
+		this.nodes = new ConcurrentHashMap<Integer, Node>();
 		this.shell = new Shell(componentName, userRequestStream, userResponseStream);
 		/*
 		 * Register all commands the Shell should support.
@@ -81,9 +81,10 @@ public class CloudController implements ICloudControllerCli, Runnable {
 		{
 			// constructs a datagram socket and binds it to the specified port
 			datagramSocket = new DatagramSocket(config.getInt("udp.port"));
-	
+			int rMax = config.getInt("controller.rmax");
+			
 			// create a new thread to listen for incoming packets
-			new ListenerThreadUDP(datagramSocket, nodes).start();
+			new ListenerThreadUDP(config, datagramSocket, nodes, rMax).start();
 		} catch (IOException e)
 		{
 			System.err.println("Cannot listen on UDP port");
@@ -191,9 +192,9 @@ public class CloudController implements ICloudControllerCli, Runnable {
 	 * reads the userConfig and initializes the Users
 	 * @return initialized List of Users
 	 */
-	private Map<String, User> readUserConfig()
+	private ConcurrentMap<String, User> readUserConfig()
 	{
-		Map<String, User> users = new HashMap<String, User>();
+		ConcurrentMap<String, User> users = new ConcurrentHashMap<String, User>();
 		Set<String> configKeys = userConfig.listKeys();
 
 		for(String key : configKeys)
