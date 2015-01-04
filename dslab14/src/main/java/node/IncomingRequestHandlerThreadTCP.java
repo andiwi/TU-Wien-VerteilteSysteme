@@ -18,8 +18,9 @@ import java.util.Set;
 
 import util.Config;
 
-public class ComputeThreadTCP extends Thread {
+public class IncomingRequestHandlerThreadTCP extends Thread {
 
+	private Node node;
 	private Socket socket;
 	private Set<Character> operators;
 	private BufferedReader reader;
@@ -36,7 +37,8 @@ public class ComputeThreadTCP extends Thread {
         }
     };
 	
-	public ComputeThreadTCP(Socket socket, Set<Character> operators, String componentName, Config config) {
+	public IncomingRequestHandlerThreadTCP(Node node, Socket socket, Set<Character> operators, String componentName, Config config) {
+		this.node = node;
 		this.socket = socket;
 		this.operators = operators;
 		this.componentName = componentName;
@@ -59,9 +61,11 @@ public class ComputeThreadTCP extends Thread {
 			while ((request = reader.readLine()) != null)
 			{
 				String response = doRequestCommand(request);
-				writer.println(response);
-
-				createLogFile(request.substring(9), response);
+				if(response != null)
+					writer.println(response);
+				
+				if(request.startsWith("!compute"))
+					createLogFile(request.substring(9), response);
 				
 				if (Thread.interrupted())
 					break;
@@ -154,7 +158,21 @@ public class ComputeThreadTCP extends Thread {
 			{
 				return "Error: Illegal Arguments.";
 			}
+		}else if(parts[0].equals("!share") && parts.length == 2)
+		{
+			int resourceForNode = Integer.parseInt(parts[1]);
+			return share(resourceForNode);
+		}else if(parts[0].equals("!commit") && parts.length == 2)
+		{
+			int resourceForNode = Integer.parseInt(parts[1]);
+			return commit(resourceForNode);
+		}else if(parts[0].equals("!rollback") && parts.length == 2)
+		{
+			int resourceForNode = Integer.parseInt(parts[1]);
+			return rollback(resourceForNode);
 		}
+			
+		
 		return "Error: Unknown Command.";
 	}
 	
@@ -185,5 +203,22 @@ public class ComputeThreadTCP extends Thread {
 			}
 		}
 		return "Error: Operator is not supported";
+	}
+	
+	public String share(int resourceForNode) {
+		if(resourceForNode >= config.getInt("node.rmin"))
+			return "!ok";
+			
+		return "!nok";
+	}
+	
+	public String commit(int resourceForNode) {
+		this.node.setResources(resourceForNode);
+		return null;
+	}
+	
+	private String rollback(int resourceForNode)
+	{
+		return null;
 	}
 }

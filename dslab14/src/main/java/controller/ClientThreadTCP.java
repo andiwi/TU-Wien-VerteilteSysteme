@@ -11,17 +11,18 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentMap;
 
 public class ClientThreadTCP extends Thread
 {
 	private Socket socket;
-	private Map<String, User> users;
-	private Map<Integer, Node> nodes;
+	private ConcurrentMap<String, User> users;
+	private ConcurrentMap<Integer, Node> nodes;
 	private User loggedInUser;
 	private BufferedReader reader;
 	private PrintWriter writer;
 
-	public ClientThreadTCP(Socket socket, Map<String, User> users, Map<Integer, Node> nodes)
+	public ClientThreadTCP(Socket socket, ConcurrentMap<String, User> users, ConcurrentMap<Integer, Node> nodes)
 	{
 		this.socket = socket;
 		this.users = users;

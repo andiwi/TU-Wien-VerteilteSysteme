@@ -11,13 +11,15 @@ import util.Config;
 
 public class ListenerThreadTCP extends Thread{
 
+	private Node node;
 	private ServerSocket serverSocket;
 	private Set<Character> operators;
 	private boolean running;
 	private String componentName;
 	private Config config;
 	
-	public ListenerThreadTCP(ServerSocket serverSocket, Set<Character> operators, String componentName, Config config) {
+	public ListenerThreadTCP(Node node, ServerSocket serverSocket, Set<Character> operators, String componentName, Config config) {
+		this.node = node;
 		this.serverSocket = serverSocket;
 		this.operators = operators;
 		this.running = true;
@@ -37,7 +39,7 @@ public class ListenerThreadTCP extends Thread{
 				socket = serverSocket.accept();
 				
 				// handle incoming connections from client with a ThreadPool in a separate thread
-				executor.execute(new ComputeThreadTCP(socket, this.operators, this.componentName, this.config));
+				executor.execute(new IncomingRequestHandlerThreadTCP(node, socket, this.operators, this.componentName, this.config));
 				
 			} catch (IOException e)
 			{
