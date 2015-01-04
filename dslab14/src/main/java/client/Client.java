@@ -1,6 +1,7 @@
 package client;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -12,6 +13,18 @@ import java.net.UnknownHostException;
 import cli.Command;
 import cli.Shell;
 import util.Config;
+import util.Keys;
+
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
+
+import javax.crypto.BadPaddingException;
+import javax.crypto.Cipher;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.NoSuchPaddingException;
+
+import controller.Base64Channel;
 
 public class Client implements IClientCli, Runnable {
 
@@ -22,6 +35,7 @@ public class Client implements IClientCli, Runnable {
 	private BufferedReader serverReader;
 	private Shell shell;
 	private ConnectorThread connector;
+	Base64Channel b = new Base64Channel();
 	
 	/**
 	 * @param componentName
@@ -192,9 +206,62 @@ public class Client implements IClientCli, Runnable {
 	// implement them for the first submission. ---
 
 	@Override
+	@Command
 	public String authenticate(String username) throws IOException {
-		// TODO Auto-generated method stub
-		return null;
+		
+		Cipher cipher;
+		byte[] enctext = null;
+		
+		// generates a 32 byte secure random number
+		SecureRandom secureRandom = new SecureRandom();
+		final byte[] number = new byte[32];
+		secureRandom.nextBytes(number);
+		
+		byte[] encnumber = b.encode(number);
+		
+		try {
+			cipher = Cipher.getInstance("RSA/NONE/OAEPWithSHA256AndMGF1Padding");
+			// MODE is the encryption/decryption mode
+			// KEY is either a private, public or secret key
+			// IV is an init vector, needed for AES
+			
+			File f = new File("keys/client/controller.pub.pem");
+			try {
+				cipher.init(Cipher.ENCRYPT_MODE, Keys.readPublicPEM(f), secureRandom);
+				
+				String authenticate = "!authenticate " + username + " " + encnumber;
+				byte[] enclogin = cipher.doFinal(authenticate.getBytes());
+				enctext = b.encode(enclogin);
+				
+				
+			} catch (InvalidKeyException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} catch (IllegalBlockSizeException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} catch (BadPaddingException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+				
+		} catch (NoSuchAlgorithmException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (NoSuchPaddingException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		doRequest(enctext.toString());
+		String s = getResponse();
+		
+		doRequest("");
+		return getResponse();
+		
+		
+		
+		
 	}
 
 	
