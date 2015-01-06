@@ -2,6 +2,7 @@ package client;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -269,7 +270,7 @@ public class Client implements IClientCli, Runnable {
 		String s = getResponse();
 		//!ok message
 		
-		System.out.println("Message 2 received!");
+		
 		byte[] dectext = b.decode(s);
 		
 		File f2 = new File("keys/client/"+username+".pem");
@@ -278,9 +279,12 @@ public class Client implements IClientCli, Runnable {
 				cipher.init(Cipher.DECRYPT_MODE, Keys.readPrivatePEM(f2));
 			} catch (InvalidKeyException e1) {
 				e1.printStackTrace();
+			} catch (FileNotFoundException e1){
+				System.out.println("Wrong username");
 			} catch (IOException e1) {
 				e1.printStackTrace();
 			}
+			System.out.println("Message 2 received!");
 			byte[] cipherData=null;
 			try {
 				cipherData = cipher.doFinal(dectext);
@@ -308,7 +312,7 @@ public class Client implements IClientCli, Runnable {
 			}
 			else
 			{
-				return "Wrong code sent from Server!";
+				return "Authentication stopped!";
 				
 			}
 		

@@ -2,6 +2,7 @@ package controller;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
@@ -116,7 +117,7 @@ public class ClientThreadTCP extends Thread
 	 * @param request
 	 * @return response of the command
 	 */
-	private String doRequestCommand(String request)
+	private String doRequestCommand(String request) throws FileNotFoundException
 	{
 		String[] parts = new String[10];
 		String text = null;
@@ -427,10 +428,14 @@ public class ClientThreadTCP extends Thread
 					
 					File f = new File("keys/controller/"+username+".pub.pem");
 					
+					
 						try {
 							cipher.init(Cipher.ENCRYPT_MODE, Keys.readPublicPEM(f), secureRandom);
 						} catch (InvalidKeyException e1) {
 							e1.printStackTrace();
+						} catch (FileNotFoundException e1){
+							System.out.println("Authentication Stopped!");
+							return "Wrong Username";
 						} catch (IOException e1) {
 							e1.printStackTrace();
 						}
