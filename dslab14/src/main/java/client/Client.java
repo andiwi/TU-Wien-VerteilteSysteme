@@ -18,13 +18,20 @@ import util.Keys;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.security.Security;
 
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.NoSuchPaddingException;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
 
+import controller.AESChannel;
 import controller.Base64Channel;
+
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
 
 public class Client implements IClientCli, Runnable {
 
@@ -36,6 +43,9 @@ public class Client implements IClientCli, Runnable {
 	private Shell shell;
 	private ConnectorThread connector;
 	Base64Channel b = new Base64Channel();
+	AESChannel a = new AESChannel();
+	SecretKey originalKey;;
+	IvParameterSpec ivParameterSpec;
 	
 	/**
 	 * @param componentName
@@ -54,6 +64,7 @@ public class Client implements IClientCli, Runnable {
 		this.socket = null;
 		this.shell = new Shell(componentName, userRequestStream, userResponseStream);
 		shell.register(this);
+		Security.addProvider(new BouncyCastleProvider());
 	}
 
 	@Override
@@ -93,6 +104,7 @@ public class Client implements IClientCli, Runnable {
 
 	private boolean doRequest(String request)
 	{
+		
 		try
 		{
 			serverWriter.println(request);
@@ -112,49 +124,55 @@ public class Client implements IClientCli, Runnable {
 	@Command
 	public String login(String username, String password)
 	{
-		doRequest("!login " + username + " " + password);
-		return getResponse();
+		String s = "!login " + username + " " + password;
+		
+		try {
+			doencRequest(new String(b.encode(s.getBytes())));
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		return getencResponse();
 	}
 
 	@Override
 	@Command
 	public String logout() throws IOException {
-		doRequest("!logout");
-		return getResponse();
+		doencRequest("!logout");
+		return getencResponse();
 	}
 
 	@Override
 	@Command
 	public String credits() throws IOException {
-		doRequest("!credits");
-		return getResponse();
+		doencRequest("!credits");
+		return getencResponse();
 	}
 
 	@Override
 	@Command
 	public String buy(long credits) throws IOException {
-		doRequest("!buy " + credits);
-		return getResponse();
+		doencRequest("!buy " + credits);
+		return getencResponse();
 	}
 
 	@Override
 	@Command
 	public String list() throws IOException {
-		doRequest("!list");
-		return getResponse();
+		doencRequest("!list");
+		return getencResponse();
 	}
 
 	@Override
 	@Command
 	public String compute(String term) throws IOException {
-		doRequest("!compute " + term);
-		return getResponse();
+		doencRequest("!compute " + term);
+		return getencResponse();
 	}
 
 	@Override
 	@Command
 	public String exit() throws IOException {
-		doRequest("!exit");
+		doencRequest("!exit");
 		closeAllStreams();
 		
 		return "Exit Client";
@@ -209,7 +227,7 @@ public class Client implements IClientCli, Runnable {
 	@Command
 	public String authenticate(String username) throws IOException {
 		
-		Cipher cipher;
+		Cipher cipher=null;
 		byte[] enctext = null;
 		
 		// generates a 32 byte secure random number
@@ -227,41 +245,119 @@ public class Client implements IClientCli, Runnable {
 			
 			File f = new File("keys/client/controller.pub.pem");
 			try {
-				cipher.init(Cipher.ENCRYPT_MODE, Keys.readPublicPEM(f), secureRandom);
+				cipher.init(Cipher.ENCRYPT_MODE, Keys.readPublicPEM(f));
 				
-				String authenticate = "!authenticate " + username + " " + encnumber;
+				String authenticate = "!authenticate " + username + " " + new String(encnumber);
 				byte[] enclogin = cipher.doFinal(authenticate.getBytes());
 				enctext = b.encode(enclogin);
 				
-				
 			} catch (InvalidKeyException e) {
-				// TODO Auto-generated catch block
 				e.printStackTrace();
 			} catch (IllegalBlockSizeException e) {
-				// TODO Auto-generated catch block
 				e.printStackTrace();
 			} catch (BadPaddingException e) {
-				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
 				
 		} catch (NoSuchAlgorithmException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		} catch (NoSuchPaddingException e) {
+			e.printStackTrace();
+		}
+		System.out.println("Message 1 sent!");
+		doRequest(new String(enctext));
+		String s = getResponse();
+		//!ok message
+		
+		System.out.println("Message 2 received!");
+		byte[] dectext = b.decode(s);
+		
+		File f2 = new File("keys/client/"+username+".pem");
+			
+			try {
+				cipher.init(Cipher.DECRYPT_MODE, Keys.readPrivatePEM(f2));
+			} catch (InvalidKeyException e1) {
+				e1.printStackTrace();
+			} catch (IOException e1) {
+				e1.printStackTrace();
+			}
+			byte[] cipherData=null;
+			try {
+				cipherData = cipher.doFinal(dectext);
+			} catch (IllegalBlockSizeException e) {
+				e.printStackTrace();
+			} catch (BadPaddingException e) {
+				e.printStackTrace();
+			}
+			
+			
+			String parts[] = new String(cipherData).split(" ");
+			if(parts[1].equals(new String(encnumber)))
+			{
+				byte[] key = b.decode(parts[3]);
+				byte[] iv = b.decode(parts[4]);
+				
+				originalKey = new SecretKeySpec(key, 0, key.length, "AES");
+				
+				ivParameterSpec = new IvParameterSpec(iv);
+				
+				String encrypted= a.encrypt(parts[2], originalKey, ivParameterSpec);
+				System.out.println("Message 3 sent!");
+				doRequest(encrypted);
+				return getResponse();
+			}
+			else
+			{
+				return "Wrong code sent from Server!";
+				
+			}
+		
+		
+	}
+	
+	private boolean doencRequest(String request)
+	{
+
+		try
+		{
+			serverWriter.println(a.encrypt(request, originalKey, ivParameterSpec));
+			return true;
+		} catch (Exception e)
+		{
+			if (connector == null)
+			{
+				connector = new ConnectorThread();
+				connector.start();
+			}
+		}
+		return false;
+	}
+	
+	private String getencResponse()
+	{
+		String response;
+		try
+		{
+			response = serverReader.readLine();
+			
+		} catch (Exception e)
+		{
+			response = "Connection lost.";
+			if (connector == null)
+			{
+				connector = new ConnectorThread();
+				connector.start();
+			}
+		}
+		byte[] text=null;
+		try {
+			text = b.decode(response);
+		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 		
-		doRequest(enctext.toString());
-		String s = getResponse();
-		
-		doRequest("");
-		return getResponse();
-		
-		
-		
-		
+		return a.decrypt(text, originalKey, ivParameterSpec);
 	}
 
 	

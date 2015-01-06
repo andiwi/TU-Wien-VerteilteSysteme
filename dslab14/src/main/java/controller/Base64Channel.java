@@ -12,10 +12,11 @@ public class Base64Channel implements Channel
 	
 	// decode from Base64 format 
 	@Override
-	public String decode(String s) throws IOException {
+	public byte[] decode(String s) throws IOException {
 		byte[] base64Message = s.getBytes();
 		byte[] encryptedMessage = Base64.decode(base64Message);
-		return encryptedMessage.toString();
+		return encryptedMessage;
+		//return new String(encryptedMessage);
 	}
 	
 	// encode into Base64 format 
