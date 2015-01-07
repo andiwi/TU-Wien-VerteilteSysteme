@@ -6,6 +6,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
+import java.net.ServerSocket;
 import java.net.Socket;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
@@ -30,6 +31,7 @@ import javax.crypto.spec.SecretKeySpec;
 
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 
+import util.Config;
 import util.Keys;
 
 public class ClientThreadTCP extends Thread
@@ -43,16 +45,20 @@ public class ClientThreadTCP extends Thread
 	private PrintWriter writer;
 	private Base64Channel b;
 	private AESChannel a;
+	private HMACChannel h;
 	SecretKey originalKey;
+	private Config config;
 
-	public ClientThreadTCP(Socket socket, ConcurrentMap<String, User> users, ConcurrentMap<Integer, Node> nodes)
+	public ClientThreadTCP(Socket socket, ConcurrentMap<String, User> users, ConcurrentMap<Integer, Node> nodes, Config config)
 	{
 		this.socket = socket;
 		this.users = users;
 		this.nodes = nodes;
 		b = new Base64Channel();
 		a = new AESChannel();
+		h = new HMACChannel();
 		Security.addProvider(new BouncyCastleProvider());
+		this.config = config;
 	}
 	
 	public void run()
@@ -265,6 +271,10 @@ public class ClientThreadTCP extends Thread
 		{
 			response += c;
 		}
+		if(response.equals("")){
+			response = "No Nodes available!";
+		}
+		
 		return a.encrypt(response, originalKey, ivParameterSpec);
 	}
 
@@ -326,6 +336,9 @@ public class ClientThreadTCP extends Thread
 						{
 							loggedInUser.setCredits(loggedInUser.getCredits() - 50); //For each computation the user has to pay credits
 							return a.encrypt(result, originalKey, ivParameterSpec);
+						}else if(result.startsWith("Message tampered!"))
+						{
+							return a.encrypt(result + " No credits lost!", originalKey, ivParameterSpec);
 						}else
 						{
 							loggedInUser.setCredits(loggedInUser.getCredits() - 50);
@@ -571,8 +584,21 @@ public class ClientThreadTCP extends Thread
 			BufferedReader nodeReader = new BufferedReader(
 					new InputStreamReader(nodeSocket.getInputStream()));
 			
-			nodeWriter.println("!compute " + number1 + " " + operator + " " + number2);
+			String message = "!compute " + number1 + " " + operator + " " + number2;
+			
+			String path = config.getString("hmac.key");
+			byte[] hmac = h.hmac(message.getBytes(), path);
+			byte[] enchmac = b.encode(hmac);
+			String hmacmessage = new String(enchmac) + " " + message;
+			nodeWriter.println(hmacmessage);
 			String response = nodeReader.readLine();
+			
+			String[] splittedresponse = response.split(" ");
+			if(splittedresponse.length>1){
+				if(splittedresponse[1].equals("!tampered")){
+					response = "Message tampered!";
+				}
+			}
 			
 			nodeWriter.close();
 			nodeReader.close();
