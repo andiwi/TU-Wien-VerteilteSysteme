@@ -1,1 +1,2 @@
-Reflect about your solution!
+Obwohl ein Gruppenmitglied (Kfir Mazor) erst am letzten Tag vor der Abgabe abgesprungen ist und seine Aufgaben nicht erledigt hat, haben wir es geschafft alle 4 stages zu zweit zu implementieren.
+Es sind alle Anforderungen erfüllt.

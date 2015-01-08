@@ -27,7 +27,6 @@ public class CheckCreditsTask extends TimerTask
 	@Override
 	public void run()
 	{
-		System.out.println("check credits for: " + username);
 		User u = users.get(username);
 		
 		if(u != null && u.getCredits() < credits)
