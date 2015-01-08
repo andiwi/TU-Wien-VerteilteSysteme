@@ -5,11 +5,19 @@ import java.io.InputStream;
 import java.io.PrintStream;
 import java.net.DatagramSocket;
 import java.net.ServerSocket;
+import java.rmi.AlreadyBoundException;
+import java.rmi.NotBoundException;
+import java.rmi.Remote;
+import java.rmi.RemoteException;
+import java.rmi.registry.LocateRegistry;
+import java.rmi.registry.Registry;
+import java.rmi.server.UnicastRemoteObject;
 import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 import util.Config;
 import cli.Command;
@@ -25,6 +33,8 @@ public class CloudController implements ICloudControllerCli, Runnable {
 	private DatagramSocket datagramSocket;
 	private Shell shell;
 	private Timer isAvailableTimer;
+	private Registry registry;
+	private ConcurrentMap<Character, AtomicLong> statistics;
 	
 
 	/**
@@ -43,6 +53,7 @@ public class CloudController implements ICloudControllerCli, Runnable {
 		this.userConfig = userConfig;
 		this.users = new ConcurrentHashMap<String, User>();
 		this.nodes = new ConcurrentHashMap<Integer, Node>();
+		this.statistics = new ConcurrentHashMap<Character, AtomicLong>();
 		this.shell = new Shell(componentName, userRequestStream, userResponseStream);
 		/*
 		 * Register all commands the Shell should support.
@@ -70,7 +81,7 @@ public class CloudController implements ICloudControllerCli, Runnable {
 			serverSocket = new ServerSocket(config.getInt("tcp.port"));
 			
 			// handle incoming connections from client in a separate thread
-			new ListenerThreadTCP(serverSocket, users, nodes).start();
+			new ListenerThreadTCP(serverSocket, users, nodes, statistics).start();
 		} catch (IOException e)
 		{
 			System.err.println("Cannot listen on TCP port");
@@ -92,6 +103,30 @@ public class CloudController implements ICloudControllerCli, Runnable {
 		}
 		
 		checkAvailableNodes();
+		
+		
+		// register for RMI
+		
+		try
+		{
+			// create and export the registry instance on localhost at the
+			// specified port
+			registry = LocateRegistry.createRegistry(config
+					.getInt("controller.rmi.port"));
+			
+			// create a remote object of this server object
+			IAdminConsole remote = (IAdminConsole) UnicastRemoteObject
+					.exportObject(new RemoteObjectRMI(this.nodes, this.statistics, this.users), 0);
+			// bind the obtained remote object on specified binding name in the
+			// registry
+			registry.bind(config.getString("binding.name"), remote);
+		} catch (RemoteException e)
+		{
+			System.err.println("Cannot setup RMI");
+		} catch (AlreadyBoundException e)
+		{
+			System.err.println("Error while binding remote object to registry.");
+		}
 		
 		try {
 			shell.writeLine("Controller is up! Enter command.");
@@ -172,6 +207,16 @@ public class CloudController implements ICloudControllerCli, Runnable {
 		if (datagramSocket != null && !datagramSocket.isClosed())
 		{
 			datagramSocket.close();
+		}
+		
+		try
+		{
+			Remote remote = registry.lookup(config.getString("binding.name"));
+			registry.unbind(config.getString("binding.name"));
+			UnicastRemoteObject.unexportObject(remote, true);
+		} catch (RemoteException | NotBoundException e)
+		{
+			// Ignored because we cannot handle it
 		}
 		
 		return "Exit CloudController";

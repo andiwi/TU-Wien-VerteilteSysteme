@@ -6,16 +6,21 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.ObjectOutputStream;
 import java.io.PrintWriter;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 import java.util.Set;
 
+import model.ComputationRequestInfo;
 import util.Config;
 
 public class IncomingRequestHandlerThreadTCP extends Thread {
@@ -27,6 +32,7 @@ public class IncomingRequestHandlerThreadTCP extends Thread {
 	private PrintWriter writer;
 	private String componentName;
 	private Config config;
+	private ObjectOutputStream objectOutputStream;
 	
 	// SimpleDateFormat is not thread-safe, so give one to each thread
     private static final ThreadLocal<SimpleDateFormat> dateFormatter = new ThreadLocal<SimpleDateFormat>(){
@@ -55,17 +61,31 @@ public class IncomingRequestHandlerThreadTCP extends Thread {
 			// prepare the writer for responding to clients requests
 			writer = new PrintWriter(socket.getOutputStream(),
 					true);
-
+			// prepare objectOutputStream for responding to admin console requests
+			objectOutputStream = new ObjectOutputStream(socket.getOutputStream());
+			
 			String request;
 			// read client requests
 			while ((request = reader.readLine()) != null)
 			{
-				String response = doRequestCommand(request);
-				if(response != null)
-					writer.println(response);
+				if(isDTORequest(request))
+				{
+					objectOutputStream.flush();
+					if(request.equals("!getLogs"))
+					{
+						objectOutputStream.writeObject(getLogs());
+					}
+					
+				}else
+				{
+					String response = doRequestCommand(request);
+					if(response != null)
+						writer.println(response);
+					
+					if(request.startsWith("!compute"))
+						createLogFile(request.substring(9), response);
+				}
 				
-				if(request.startsWith("!compute"))
-					createLogFile(request.substring(9), response);
 				
 				if (Thread.interrupted())
 					break;
@@ -76,7 +96,53 @@ public class IncomingRequestHandlerThreadTCP extends Thread {
 			closeAllStreams();
 		}	
 	}
-	
+
+	private List<ComputationRequestInfo> getLogs()
+	{
+		String pathStr = config.getString("log.dir");
+		File directory = new File(pathStr);
+		File[] logFiles = directory.listFiles();
+		
+		List<ComputationRequestInfo> logs = new ArrayList<ComputationRequestInfo>();
+		if(logFiles != null)
+		{
+			for(int i = 0; i < logFiles.length; i++)
+			{
+				//read file and save to ComputationRequestInfoList
+			    try
+				{
+			    	String filename = logFiles[i].getName();
+			    	String[] filenameSplitted = filename.split("_"); 
+			    	String timestamp = filenameSplitted[0] + filenameSplitted[1];
+			    	String node = filenameSplitted[2];
+			    	node = node.split("\\.")[0];
+			    	
+					List<String> lines = Files.readAllLines(logFiles[i].toPath(), StandardCharsets.UTF_8);
+					
+					ComputationRequestInfo rInfo = new ComputationRequestInfo();
+					rInfo.setMathematicalTerm(lines.get(0) + " = " + lines.get(1));
+					rInfo.setNode(node);
+					rInfo.setTimestamp(timestamp);
+					
+					logs.add(rInfo);
+				} catch (IOException e)
+				{
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+			}
+		}
+		return logs;
+	}
+
+	private boolean isDTORequest(String request)
+	{
+		if(request.equals("!getLogs"))
+			return true;
+		
+		return false;
+	}
+
 	private synchronized void createLogFile(String row1, String row2)
 	{
 		String date = dateFormatter.get().format(new Date());
@@ -121,6 +187,15 @@ public class IncomingRequestHandlerThreadTCP extends Thread {
 		
 		if(writer != null)
 			writer.close();
+		
+		if(objectOutputStream != null)
+			try
+			{
+				objectOutputStream.close();
+			} catch (IOException e1)
+			{
+				// Ignored because we cannot handle it
+			}
 		
 		if (socket != null && !socket.isClosed())
 		{

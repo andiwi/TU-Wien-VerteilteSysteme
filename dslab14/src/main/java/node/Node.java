@@ -394,7 +394,7 @@ public class Node implements INodeCli, Runnable {
 				if (response.equals("!ok")) 
 				{
 					getOkNodes().getAndIncrement();
-				}else if (response.equals("!nok"))
+				}else //!nok
 				{
 					getOkNodes().getAndSet(Integer.MIN_VALUE);
 				}

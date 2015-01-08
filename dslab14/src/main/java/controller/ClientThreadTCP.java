@@ -18,6 +18,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
@@ -44,8 +45,9 @@ public class ClientThreadTCP extends Thread
 	private Base64Channel b;
 	private AESChannel a;
 	SecretKey originalKey;
+	private ConcurrentMap<Character, AtomicLong> statistics;
 
-	public ClientThreadTCP(Socket socket, ConcurrentMap<String, User> users, ConcurrentMap<Integer, Node> nodes)
+	public ClientThreadTCP(Socket socket, ConcurrentMap<String, User> users, ConcurrentMap<Integer, Node> nodes, ConcurrentMap<Character, AtomicLong> statistics)
 	{
 		this.socket = socket;
 		this.users = users;
@@ -53,6 +55,7 @@ public class ClientThreadTCP extends Thread
 		b = new Base64Channel();
 		a = new AESChannel();
 		Security.addProvider(new BouncyCastleProvider());
+		this.statistics = statistics;
 	}
 	
 	public void run()
@@ -307,6 +310,9 @@ public class ClientThreadTCP extends Thread
 					return a.encrypt(text, originalKey, ivParameterSpec);
 				}
 				
+				//increase operator usage in statistics
+				updateStatistics(operator);
+				
 				boolean tryAgain = true;
 				int trials = 0; //counter that prevents infinity loops
 				while(tryAgain && (trials < 10))
@@ -351,7 +357,7 @@ public class ClientThreadTCP extends Thread
 		}
 		
 	}
-	
+
 	private String logout()
 	{
 		if(loggedInUser == null){
@@ -623,6 +629,17 @@ public class ClientThreadTCP extends Thread
 		{
 			return true;
 		}else return false;
+	}
+	
+	private void updateStatistics(char operator)
+	{
+		AtomicLong value = statistics.get(operator);
+		if (value == null) {
+	        value = statistics.putIfAbsent(operator, new AtomicLong(1));
+	    }
+	    if (value != null) {
+	        value.incrementAndGet();
+	    }
 	}
 	
 	private byte[] decryption(byte[] text) throws NoSuchAlgorithmException, NoSuchPaddingException, IllegalBlockSizeException, BadPaddingException{

@@ -5,10 +5,10 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class ListenerThreadTCP extends Thread
 {
@@ -16,11 +16,13 @@ public class ListenerThreadTCP extends Thread
 	private ConcurrentMap<String, User> users;
 	private ConcurrentMap<Integer, Node> nodes;
 	private boolean running;
+	private ConcurrentMap<Character, AtomicLong> statistics;
 
-	public ListenerThreadTCP(ServerSocket serverSocket, ConcurrentMap<String, User> users, ConcurrentMap<Integer, Node> nodes) {
+	public ListenerThreadTCP(ServerSocket serverSocket, ConcurrentMap<String, User> users, ConcurrentMap<Integer, Node> nodes, ConcurrentMap<Character, AtomicLong> statistics) {
 		this.serverSocket = serverSocket;
 		this.users = users;
 		this.nodes = nodes;
+		this.statistics = statistics;
 		this.running = true;
 	}
 	
@@ -36,7 +38,7 @@ public class ListenerThreadTCP extends Thread
 				socket = serverSocket.accept();
 				sockets.add(socket);
 				// handle incoming connections from client with a ThreadPool in a separate thread
-				executor.execute(new ClientThreadTCP(socket, users, nodes));
+				executor.execute(new ClientThreadTCP(socket, users, nodes, statistics));
 								
 			} catch (IOException e)
 			{
