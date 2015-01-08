@@ -72,12 +72,11 @@ public class IncomingRequestHandlerThreadTCP extends Thread {
 					writer.println(response);
 				
 				String parts[] = request.split(" ");
-				String parts2[] = response.split(" ");
-				if(parts[1].startsWith("!compute") && parts2.length>1){
-					if(!parts2[1].startsWith("!tampered")){
-						String text =  parts[1] + " " + parts[2] + " " + parts[3] + " " + parts[4];
-						createLogFile(text.substring(9), response);
-					}
+				if(parts[1].startsWith("!compute") && response.split(" ").length < 3){
+					
+					String[] subparts = request.split("!compute ");
+					String after = subparts[1];
+						createLogFile(after, response);
 				}
 				
 				if (Thread.interrupted())
