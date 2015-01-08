@@ -83,8 +83,7 @@ public class AdminConsole implements IAdminConsole, Runnable {
 
 	private void exit()
 	{
-		// TODO Auto-generated method stub
-		
+		shell.close();		
 	}
 	
 	@Command("getLogs")
@@ -95,8 +94,7 @@ public class AdminConsole implements IAdminConsole, Runnable {
 			response = server.getLogs();
 		} catch (RemoteException e)
 		{
-			// TODO Auto-generated catch block
-			return e.getMessage().toString();
+			return "Connection error";
 		}
 		
 		if(response.isEmpty())
@@ -121,8 +119,7 @@ public class AdminConsole implements IAdminConsole, Runnable {
 			response = server.statistics();
 		} catch (RemoteException e)
 		{
-			// TODO Auto-generated catch block
-			return e.getMessage().toString();
+			return "Connection error";
 		}
 		
 		if(response.isEmpty())

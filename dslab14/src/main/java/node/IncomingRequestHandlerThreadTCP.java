@@ -67,25 +67,34 @@ public class IncomingRequestHandlerThreadTCP extends Thread {
 			reader = new BufferedReader(
 					new InputStreamReader(socket.getInputStream()));
 			// prepare the writer for responding to clients requests
-			writer = new PrintWriter(socket.getOutputStream(),
-					true);
+			//writer = new PrintWriter(socket.getOutputStream(),
+			//		true);
 			// prepare objectOutputStream for responding to admin console requests
-			objectOutputStream = new ObjectOutputStream(socket.getOutputStream());
+			//objectOutputStream = new ObjectOutputStream(socket.getOutputStream());
 			
 			String request;
 			// read client requests
 			while ((request = reader.readLine()) != null)
 			{
+				
 				if(isDTORequest(request))
 				{
-					objectOutputStream.flush();
+					//prepare objectOutputStream for responding to admin console requests
+					objectOutputStream = new ObjectOutputStream(socket.getOutputStream());
 					if(request.equals("!getLogs"))
 					{
 						objectOutputStream.writeObject(getLogs());
 					}
-					
+					objectOutputStream.flush();
+				
 				}else
 				{
+					if(writer == null)
+					{
+						writer = new PrintWriter(socket.getOutputStream(),
+								true);
+					}
+					
 					String response = doRequestCommand(request);
 					if(response != null)
 						writer.println(response);
@@ -140,8 +149,7 @@ public class IncomingRequestHandlerThreadTCP extends Thread {
 					logs.add(rInfo);
 				} catch (IOException e)
 				{
-					// TODO Auto-generated catch block
-					e.printStackTrace();
+					return logs;
 				}
 			}
 		}

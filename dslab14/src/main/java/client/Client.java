@@ -381,8 +381,7 @@ public class Client implements IClientCli, Runnable {
 		try {
 			text = b.decode(response);
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+			closeAllStreams();
 		}
 		
 		return a.decrypt(text, originalKey, ivParameterSpec);

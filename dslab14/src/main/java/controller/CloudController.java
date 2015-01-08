@@ -35,6 +35,7 @@ public class CloudController implements ICloudControllerCli, Runnable {
 	private Timer isAvailableTimer;
 	private Registry registry;
 	private ConcurrentMap<Character, AtomicLong> statistics;
+	RemoteObjectRMI remoteObjectRMI;
 	
 
 	/**
@@ -114,9 +115,10 @@ public class CloudController implements ICloudControllerCli, Runnable {
 			registry = LocateRegistry.createRegistry(config
 					.getInt("controller.rmi.port"));
 			
+			remoteObjectRMI = new RemoteObjectRMI(this.nodes, this.statistics, this.users);
 			// create a remote object of this server object
 			IAdminConsole remote = (IAdminConsole) UnicastRemoteObject
-					.exportObject(new RemoteObjectRMI(this.nodes, this.statistics, this.users), 0);
+					.exportObject(remoteObjectRMI, 0);
 			// bind the obtained remote object on specified binding name in the
 			// registry
 			registry.bind(config.getString("binding.name"), remote);
@@ -211,9 +213,10 @@ public class CloudController implements ICloudControllerCli, Runnable {
 		
 		try
 		{
+			remoteObjectRMI.exit();
 			Remote remote = registry.lookup(config.getString("binding.name"));
 			registry.unbind(config.getString("binding.name"));
-			UnicastRemoteObject.unexportObject(remote, true);
+			UnicastRemoteObject.unexportObject(remote, true);			
 		} catch (RemoteException | NotBoundException e)
 		{
 			// Ignored because we cannot handle it

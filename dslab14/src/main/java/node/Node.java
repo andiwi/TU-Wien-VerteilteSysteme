@@ -199,6 +199,7 @@ public class Node implements INodeCli, Runnable {
 		if(resourceForEachNode >= config.getInt("node.rmin")) 
 		{
 			if(nodes.isEmpty()) {
+				resources.set(rMax);
 				return true; //this is the first node in the network
 			}else
 			{
@@ -300,6 +301,7 @@ public class Node implements INodeCli, Runnable {
 	// implement them for the first submission. ---
 
 	@Override
+	@Command
 	public String resources() throws IOException {
 		return this.resources +"";
 	}
@@ -412,6 +414,7 @@ public class Node implements INodeCli, Runnable {
 				
 				if(getOkNodes().get() == nodesInNetwork)
 				{
+					resources.set(resourceForNode);
 					sendCommit();
 				}else if(getOkNodes().get() < 0)
 				{

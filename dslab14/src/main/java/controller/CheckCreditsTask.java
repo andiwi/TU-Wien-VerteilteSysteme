@@ -37,7 +37,6 @@ public class CheckCreditsTask extends TimerTask
 				callback.notify(username, credits);
 			} catch (RemoteException e)
 			{
-				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
 			checkTimer.cancel();

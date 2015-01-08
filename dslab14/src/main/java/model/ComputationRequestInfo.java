@@ -1,7 +1,6 @@
 package model;
 
 import java.io.Serializable;
-import java.util.Date;
 
 /**
  * Please note that this class is not needed for Lab 1, but will later be

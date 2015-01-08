@@ -16,11 +16,10 @@ import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Timer;
-import java.util.TimerTask;
 import java.util.Map.Entry;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -32,12 +31,14 @@ public class RemoteObjectRMI implements IAdminConsole
 	private ConcurrentMap<Integer, Node> nodes;
 	private	ConcurrentMap<String, User> users;
 	private ConcurrentMap<Character, AtomicLong> statistics;
+	private List<Timer> timerList;
 	
 	public RemoteObjectRMI(ConcurrentMap<Integer, Node> nodes, ConcurrentMap<Character, AtomicLong> statistics, ConcurrentMap<String, User> users)
 	{
 		this.nodes = nodes;
 		this.users = users;
-		this.statistics = statistics;		
+		this.statistics = statistics;	
+		this.timerList = new ArrayList<Timer>();
 	}
 	
 	@Override
@@ -47,6 +48,7 @@ public class RemoteObjectRMI implements IAdminConsole
 		Timer checkTimer = new Timer(true);
 		TimerTask checkCreditsTask = new CheckCreditsTask(users, username, credits, callback, checkTimer);
 		checkTimer.scheduleAtFixedRate(checkCreditsTask, 0, 1000);
+		timerList.add(checkTimer);
 		return true;
 	}
 
@@ -78,12 +80,10 @@ public class RemoteObjectRMI implements IAdminConsole
 				nodeSocket.close();
 			} catch (IOException e)
 			{
-				// TODO Auto-generated catch block
-				e.printStackTrace();
+				return logs;
 			} catch (ClassNotFoundException e)
 			{
-				// TODO Auto-generated catch block
-				e.printStackTrace();
+				return logs;
 			}
 		}
 		
@@ -132,5 +132,12 @@ public class RemoteObjectRMI implements IAdminConsole
 	{
 		// TODO Auto-generated method stub
 		
+	}
+	
+	public void exit() {
+		for(Timer t : timerList)
+		{
+			t.cancel();
+		}
 	}
 }
