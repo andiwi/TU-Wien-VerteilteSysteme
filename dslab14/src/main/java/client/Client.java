@@ -125,14 +125,15 @@ public class Client implements IClientCli, Runnable {
 	@Command
 	public String login(String username, String password)
 	{
-		String s = "!login " + username + " " + password;
-		
-		try {
-			doencRequest(new String(b.encode(s.getBytes())));
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-		return getencResponse();
+		return "Command is under construction! Please use !authenticate <username> instead.";
+//		String s = "!login " + username + " " + password;
+//		
+//		try {
+//			doencRequest(new String(b.encode(s.getBytes())));
+//		} catch (IOException e) {
+//			e.printStackTrace();
+//		}
+//		return getencResponse();
 	}
 
 	@Override
@@ -266,7 +267,8 @@ public class Client implements IClientCli, Runnable {
 			// KEY is either a private, public or secret key
 			// IV is an init vector, needed for AES
 			
-			File f = new File("keys/client/controller.pub.pem");
+			String path = config.getString("controller.key");
+			File f = new File(path);
 			try {
 				cipher.init(Cipher.ENCRYPT_MODE, Keys.readPublicPEM(f));
 				
@@ -294,8 +296,8 @@ public class Client implements IClientCli, Runnable {
 		
 		
 		byte[] dectext = b.decode(s);
-		
-		File f2 = new File("keys/client/"+username+".pem");
+		String path = config.getString("keys.dir");
+		File f2 = new File(path + "/" + username+".pem");
 			
 			try {
 				cipher.init(Cipher.DECRYPT_MODE, Keys.readPrivatePEM(f2));

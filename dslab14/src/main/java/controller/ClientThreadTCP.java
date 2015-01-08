@@ -197,6 +197,7 @@ public class ClientThreadTCP extends Thread
 
 	private synchronized String login(String username, String password)
 	{
+		
 		if(loggedInUser == null)
 		{
 			if(users.containsKey(username))
@@ -438,8 +439,8 @@ public class ClientThreadTCP extends Thread
 					// MODE is the encryption/decryption mode
 					// KEY is either a private, public or secret key
 					// IV is an init vector, needed for AES
-					
-					File f = new File("keys/controller/"+username+".pub.pem");
+					String path = config.getString("keys.dir");
+					File f = new File(path + "/" + username+".pub.pem");
 					
 					
 						try {
@@ -655,7 +656,8 @@ public class ClientThreadTCP extends Thread
 		
 
 		Cipher cipher = Cipher.getInstance("RSA/NONE/OAEPWithSHA256AndMGF1Padding");
-		File f = new File("keys/controller/controller.pem");
+		String path = config.getString("key");
+		File f = new File(path);
 		try {
 			cipher.init(Cipher.DECRYPT_MODE, Keys.readPrivatePEM(f));
 		} catch (InvalidKeyException e) {
