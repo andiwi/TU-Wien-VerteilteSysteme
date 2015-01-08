@@ -6,6 +6,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
+import java.net.ServerSocket;
 import java.net.Socket;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
@@ -31,6 +32,7 @@ import javax.crypto.spec.SecretKeySpec;
 
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 
+import util.Config;
 import util.Keys;
 
 public class ClientThreadTCP extends Thread
@@ -44,18 +46,22 @@ public class ClientThreadTCP extends Thread
 	private PrintWriter writer;
 	private Base64Channel b;
 	private AESChannel a;
+	private HMACChannel h;
 	SecretKey originalKey;
 	private ConcurrentMap<Character, AtomicLong> statistics;
+	private Config config;
 
-	public ClientThreadTCP(Socket socket, ConcurrentMap<String, User> users, ConcurrentMap<Integer, Node> nodes, ConcurrentMap<Character, AtomicLong> statistics)
+	public ClientThreadTCP(Socket socket, ConcurrentMap<String, User> users, ConcurrentMap<Integer, Node> nodes, ConcurrentMap<Character, AtomicLong> statistics, Config config)
 	{
 		this.socket = socket;
 		this.users = users;
 		this.nodes = nodes;
 		b = new Base64Channel();
 		a = new AESChannel();
+		h = new HMACChannel();
 		Security.addProvider(new BouncyCastleProvider());
 		this.statistics = statistics;
+		this.config = config;
 	}
 	
 	public void run()
@@ -194,6 +200,7 @@ public class ClientThreadTCP extends Thread
 
 	private synchronized String login(String username, String password)
 	{
+		
 		if(loggedInUser == null)
 		{
 			if(users.containsKey(username))
@@ -268,6 +275,10 @@ public class ClientThreadTCP extends Thread
 		{
 			response += c;
 		}
+		if(response.equals("")){
+			response = "No Nodes available!";
+		}
+		
 		return a.encrypt(response, originalKey, ivParameterSpec);
 	}
 
@@ -332,6 +343,9 @@ public class ClientThreadTCP extends Thread
 						{
 							loggedInUser.setCredits(loggedInUser.getCredits() - 50); //For each computation the user has to pay credits
 							return a.encrypt(result, originalKey, ivParameterSpec);
+						}else if(result.startsWith("Message tampered!"))
+						{
+							return a.encrypt(result + " No credits lost!", originalKey, ivParameterSpec);
 						}else
 						{
 							loggedInUser.setCredits(loggedInUser.getCredits() - 50);
@@ -431,8 +445,8 @@ public class ClientThreadTCP extends Thread
 					// MODE is the encryption/decryption mode
 					// KEY is either a private, public or secret key
 					// IV is an init vector, needed for AES
-					
-					File f = new File("keys/controller/"+username+".pub.pem");
+					String path = config.getString("keys.dir");
+					File f = new File(path + "/" + username+".pub.pem");
 					
 					
 						try {
@@ -577,8 +591,21 @@ public class ClientThreadTCP extends Thread
 			BufferedReader nodeReader = new BufferedReader(
 					new InputStreamReader(nodeSocket.getInputStream()));
 			
-			nodeWriter.println("!compute " + number1 + " " + operator + " " + number2);
+			String message = "!compute " + number1 + " " + operator + " " + number2;
+			
+			String path = config.getString("hmac.key");
+			byte[] hmac = h.hmac(message.getBytes(), path);
+			byte[] enchmac = b.encode(hmac);
+			String hmacmessage = new String(enchmac) + " " + message;
+			nodeWriter.println(hmacmessage);
 			String response = nodeReader.readLine();
+			
+			String[] splittedresponse = response.split(" ");
+			if(splittedresponse.length>1){
+				if(splittedresponse[1].equals("!tampered")){
+					response = "Message tampered!";
+				}
+			}
 			
 			nodeWriter.close();
 			nodeReader.close();
@@ -646,7 +673,8 @@ public class ClientThreadTCP extends Thread
 		
 
 		Cipher cipher = Cipher.getInstance("RSA/NONE/OAEPWithSHA256AndMGF1Padding");
-		File f = new File("keys/controller/controller.pem");
+		String path = config.getString("key");
+		File f = new File(path);
 		try {
 			cipher.init(Cipher.DECRYPT_MODE, Keys.readPrivatePEM(f));
 		} catch (InvalidKeyException e) {

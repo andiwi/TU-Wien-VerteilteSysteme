@@ -14,11 +14,15 @@ import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.security.MessageDigest;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Set;
+
+import controller.Base64Channel;
+import controller.HMACChannel;
 
 import model.ComputationRequestInfo;
 import util.Config;
@@ -33,6 +37,8 @@ public class IncomingRequestHandlerThreadTCP extends Thread {
 	private String componentName;
 	private Config config;
 	private ObjectOutputStream objectOutputStream;
+	private Base64Channel b;
+	private HMACChannel h;
 	
 	// SimpleDateFormat is not thread-safe, so give one to each thread
     private static final ThreadLocal<SimpleDateFormat> dateFormatter = new ThreadLocal<SimpleDateFormat>(){
@@ -49,6 +55,8 @@ public class IncomingRequestHandlerThreadTCP extends Thread {
 		this.operators = operators;
 		this.componentName = componentName;
 		this.config = config;
+		b = new Base64Channel();
+		h = new HMACChannel();
 	}
 	
 	public void run()
@@ -82,8 +90,13 @@ public class IncomingRequestHandlerThreadTCP extends Thread {
 					if(response != null)
 						writer.println(response);
 					
-					if(request.startsWith("!compute"))
-						createLogFile(request.substring(9), response);
+					String parts[] = request.split(" ");
+					if(parts[1].startsWith("!compute") && response.split(" ").length < 3){
+					
+						String[] subparts = request.split("!compute ");
+						String after = subparts[1];
+						createLogFile(after, response);
+					}
 				}
 				
 				
@@ -216,19 +229,40 @@ public class IncomingRequestHandlerThreadTCP extends Thread {
 	{
 		String parts[] = request.split(" ");
 		
-		if(parts[0].equals("!compute") && parts.length == 4)
+		if(parts[1].equals("!compute") && parts.length == 5)
 		{	
 			try
 			{
-				int number1 = Integer.parseInt(parts[1]);
-				String operatorStr = parts[2];
+				int number1 = Integer.parseInt(parts[2]);
+				String operatorStr = parts[3];
 				if(operatorStr.length() != 1)
 					return "Error: Illegal operator: " + operatorStr;
 				
 				char operator = operatorStr.charAt(0);
-				int number2 = Integer.parseInt(parts[3]);
+				int number2 = Integer.parseInt(parts[4]);
 				
-				return compute(number1, operator, number2);
+				String originalmessage = parts[1] + " " + parts[2] + " " + parts[3] + " " + parts[4];
+				byte[] dechmac = null;
+				try {
+					dechmac = b.decode(parts[0]);
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+				String path = config.getString("hmac.key");
+				byte[]hmac = null;
+				try {
+					hmac = h.hmac(originalmessage.getBytes(), path);
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+				String hmacanswer = parts[0] + " !tampered " + parts[2] + " " + parts[3] + " " + parts[4];
+				if (MessageDigest.isEqual(hmac, dechmac)){
+					return compute(number1, operator, number2);
+				}
+				else{
+					return hmacanswer;
+				}
+				
 			}catch(NumberFormatException e)
 			{
 				return "Error: Illegal Arguments.";

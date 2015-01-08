@@ -125,26 +125,35 @@ public class Client implements IClientCli, Runnable {
 	@Command
 	public String login(String username, String password)
 	{
-		String s = "!login " + username + " " + password;
-		
-		try {
-			doencRequest(new String(b.encode(s.getBytes())));
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-		return getencResponse();
+		return "Command is under construction! Please use !authenticate <username> instead.";
+//		String s = "!login " + username + " " + password;
+//		
+//		try {
+//			doencRequest(new String(b.encode(s.getBytes())));
+//		} catch (IOException e) {
+//			e.printStackTrace();
+//		}
+//		return getencResponse();
 	}
 
 	@Override
 	@Command
 	public String logout() throws IOException {
+		if(originalKey ==null){
+			return "Authenticate first";
+		}
 		doencRequest("!logout");
-		return getencResponse();
+		String textitext = getencResponse();
+		originalKey = null;
+		return textitext;
 	}
 
 	@Override
 	@Command
 	public String credits() throws IOException {
+		if(originalKey ==null){
+			return "Authenticate first";
+		}
 		doencRequest("!credits");
 		return getencResponse();
 	}
@@ -152,6 +161,9 @@ public class Client implements IClientCli, Runnable {
 	@Override
 	@Command
 	public String buy(long credits) throws IOException {
+		if(originalKey ==null){
+			return "Authenticate first";
+		}
 		doencRequest("!buy " + credits);
 		return getencResponse();
 	}
@@ -159,6 +171,9 @@ public class Client implements IClientCli, Runnable {
 	@Override
 	@Command
 	public String list() throws IOException {
+		if(originalKey ==null){
+			return "Authenticate first";
+		}
 		doencRequest("!list");
 		return getencResponse();
 	}
@@ -166,6 +181,9 @@ public class Client implements IClientCli, Runnable {
 	@Override
 	@Command
 	public String compute(String term) throws IOException {
+		if(originalKey ==null){
+			return "Authenticate first";
+		}
 		doencRequest("!compute " + term);
 		return getencResponse();
 	}
@@ -173,7 +191,9 @@ public class Client implements IClientCli, Runnable {
 	@Override
 	@Command
 	public String exit() throws IOException {
-		doencRequest("!exit");
+		if(originalKey !=null){
+			doencRequest("!exit");
+		}
 		closeAllStreams();
 		
 		return "Exit Client";
@@ -228,6 +248,9 @@ public class Client implements IClientCli, Runnable {
 	@Command
 	public String authenticate(String username) throws IOException {
 		
+		if(originalKey !=null){
+			return "Logout first!";
+		}
 		Cipher cipher=null;
 		byte[] enctext = null;
 		
@@ -244,7 +267,8 @@ public class Client implements IClientCli, Runnable {
 			// KEY is either a private, public or secret key
 			// IV is an init vector, needed for AES
 			
-			File f = new File("keys/client/controller.pub.pem");
+			String path = config.getString("controller.key");
+			File f = new File(path);
 			try {
 				cipher.init(Cipher.ENCRYPT_MODE, Keys.readPublicPEM(f));
 				
@@ -272,8 +296,8 @@ public class Client implements IClientCli, Runnable {
 		
 		
 		byte[] dectext = b.decode(s);
-		
-		File f2 = new File("keys/client/"+username+".pem");
+		String path = config.getString("keys.dir");
+		File f2 = new File(path + "/" + username+".pem");
 			
 			try {
 				cipher.init(Cipher.DECRYPT_MODE, Keys.readPrivatePEM(f2));
@@ -364,7 +388,7 @@ public class Client implements IClientCli, Runnable {
 		return a.decrypt(text, originalKey, ivParameterSpec);
 	}
 
-	
+
 	
 	
 	
